@@ -1,22 +1,16 @@
 ---
 - hosts: all
   tasks:
-  - name: Install flannel on all nodes
+  - name: Install flannel, libselinux, kubernetes and docker on all nodes
     yum:
-      name: flannel
+      name: {{item}}
       state: latest
-  - name: Install libselinux-python
-    yum: 
-      name: libselinux-python
-      state: latest
-  - name: Install kubernetes
-    yum:
-      name: kubernetes
-      state: latest
-  - name: Install docker
-    yum:
-      name: docker
-      state: latest
+    with_items:
+      - flannel
+      - libselinux
+      - docker
+      - kubernetes
+        
   - name: Change kubernetes KUBE_MASTER configuration
     lineinfile:
       path: /etc/kubernetes/config
@@ -24,6 +18,7 @@
       regexp: '^KUBE_MASTER.*$'
       line: 'KUBE_MASTER="--master=http://kube-master:8080"'
       backup: yes
+
   - name: Configure kubernetes apiserver
     copy:
      src: files/apiserver
@@ -53,11 +48,13 @@
       name: kube-proxy
       state: started
       enabled: True
+      
   - name: Enable and start kubelet
     systemd:
       name: kubelet
       state: started
       enabled: True
+
   - name: Enable and start docker
     systemd:
       name: docker
@@ -125,6 +122,8 @@
       name: kube-scheduler
       state: started
       enabled: True
+
+################################################################################
 
 - hosts: nodes
   tasks:
