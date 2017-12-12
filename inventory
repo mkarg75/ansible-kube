@@ -1,11 +1,11 @@
 [masters]
-kube-master.lab.gutski.de
+kube-master
 
 [nodes] 
-kube-node1.lab.gutski.de
-kube-node2.lab.gutski.de
-kube-node3.lab.gutski.de
+kube-node1
+kube-node2
+kube-node3
 
 [etcd]
-kube-master.lab.gutski.de
+kube-master
 
