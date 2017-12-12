@@ -1,0 +1,147 @@
+---
+- hosts: all
+  tasks:
+  - name: Install flannel on all nodes
+    yum:
+      name: flannel
+      state: latest
+  - name: Install libselinux-python
+    yum: 
+      name: libselinux-python
+      state: latest
+  - name: Install kubernetes
+    yum:
+      name: kubernetes
+      state: latest
+  - name: Install docker
+    yum:
+      name: docker
+      state: latest
+  - name: Change kubernetes KUBE_MASTER configuration
+    lineinfile:
+      path: /etc/kubernetes/config
+      state: present
+      regexp: '^KUBE_MASTER.*$'
+      line: 'KUBE_MASTER="--master=http://kube-master:8080"'
+      backup: yes
+  - name: Configure kubernetes apiserver
+    copy:
+     src: files/apiserver
+     dest: /etc/kubernetes/apiserver
+     owner: root
+     group: root
+     mode: 0644
+     backup: yes
+
+  - name: Shutdown firewalling
+    systemd:
+      name: firewalld
+      state: stopped
+      enabled: False
+  
+  - name: Deploy kubelet config file
+    copy:
+      src: files/kubelet
+      dest: /etc/kubernetes/kubelet
+      owner: root
+      group: root
+      mode: 0644
+      backup: yes
+
+  - name: Enable and start kubelet-proxy
+    systemd:
+      name: kube-proxy
+      state: started
+      enabled: True
+  - name: Enable and start kubelet
+    systemd:
+      name: kubelet
+      state: started
+      enabled: True
+  - name: Enable and start docker
+    systemd:
+      name: docker
+      state: restarted
+      enabled: True
+
+
+################################################################################
+
+
+- hosts: etcd
+  tasks:
+  - name: Install etcd
+    yum: 
+      name: etcd
+      state: latest
+  
+  - name: Change etcd config to listen not only to localhost
+    lineinfile:
+      path: /etc/etcd/etcd.conf
+      state: present
+      regexp: '^ETCD_LISTEN_CLIENT_URLS.*$'
+      line: 'ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"'
+      backup: yes
+
+  - name: Change etcd config to advertise not only to localhost
+    lineinfile:
+      path: /etc/etcd/etcd.conf
+      state: present
+      regexp: '^ETCD_ADVERTISE_CLIENT_URLS.*$'
+      line: 'ETCD_ADVERTISE_CLIENT_URLS="http://0.0.0.0:2379"'
+      backup: yes
+
+  - name: Start and enable etcd 
+    systemd:
+      name: etcd
+      state: restarted
+      enabled: True
+
+  - name: Copy flannel configuration file
+    copy: 
+      src: files/flannel-config.json
+      dest: /root/flannel-config.json
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Feed flannel configuration file into etcd 
+    shell: etcdctl set /atomic.io/network/config < /root/flannel-config.json 
+    args: 
+      executable: /bin/bash
+
+  - name: Start and enable kube-apiserver
+    systemd:
+      name: kube-apiserver
+      state: started
+      enabled: True
+  - name: Start and enable kube-controller-manager
+    systemd:
+      name: kube-controller-manager
+      state: started
+      enabled: True
+  - name: Start and enable kube-scheduler
+    systemd:
+      name: kube-scheduler
+      state: started
+      enabled: True
+
+- hosts: nodes
+  tasks:
+  - name: Copy flannel client configuration file
+    copy:
+      src: files/flanneld
+      dest: /etc/sysconfig/flanneld
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Enable and start flanneld
+    systemd:
+      name: flanneld
+      state: started
+      enabled: True
+
+
+
+
